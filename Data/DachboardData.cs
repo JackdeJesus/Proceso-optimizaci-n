@@ -1,0 +1,557 @@
+﻿using PoderJudicial.Models;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.OleDb;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Windows;
+using PoderJudicial.Helpers;
+
+namespace PoderJudicial.Data
+{
+    public class DashboardData
+    {
+        public int ObtenerTotalAudienciasMes()
+        {
+            int total = 0;
+
+            DateTime inicioMes =
+                new DateTime(
+                    DateTime.Now.Year,
+                    DateTime.Now.Month,
+                    1);
+
+            DateTime inicioSiguienteMes =
+                inicioMes.AddMonths(1);
+
+            using (OleDbConnection conn = Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+                foreach (string nombreTabla in ObtenerTablasAudiencias(conn))
+                {
+                    try
+                    {
+                        string query = $@"
+                SELECT COUNT(*)
+                FROM [{nombreTabla}]
+                WHERE FeAudiencia >= ?
+                AND FeAudiencia < ?";
+
+                        using (OleDbCommand cmd =
+                            new OleDbCommand(query, conn))
+                        {
+                            cmd.Parameters.AddWithValue("?", inicioMes);
+                            cmd.Parameters.AddWithValue("?", inicioSiguienteMes);
+
+                            object resultado = cmd.ExecuteScalar();
+
+                            if (resultado != null &&
+                                resultado != DBNull.Value)
+                            {
+                                total += Convert.ToInt32(resultado);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            ex.Message,
+                            nombreTabla);
+                    }
+                }
+            }
+
+            return total;
+        }
+
+
+
+        public int ObtenerTotalEjecucionesMes()
+        {
+            int total = 0;
+
+            DateTime inicioMes =
+                new DateTime(
+                    DateTime.Now.Year,
+                    DateTime.Now.Month,
+                    1);
+
+            DateTime inicioSiguienteMes =
+                inicioMes.AddMonths(1);
+
+            using (OleDbConnection conn =
+                Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+                string query = @"
+            SELECT COUNT(*)
+            FROM Ejecucion
+            WHERE FechaAudiencia >= ?
+            AND FechaAudiencia < ?";
+
+                using (OleDbCommand cmd =
+                    new OleDbCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "?",
+                        inicioMes);
+
+                    cmd.Parameters.AddWithValue(
+                        "?",
+                        inicioSiguienteMes);
+
+                    object resultado =
+                       cmd.ExecuteScalar();
+
+                    if (resultado != null &&
+                        resultado != DBNull.Value)
+                    {
+                        total = Convert.ToInt32(resultado);
+                    }
+                }
+            }
+
+            return total;
+        }
+
+
+
+        public int ObtenerTotalCopiasMes()
+        {
+            int total = 0;
+
+            DateTime inicioMes =
+                new DateTime(
+                    DateTime.Now.Year,
+                    DateTime.Now.Month,
+                    1);
+
+            DateTime inicioSiguienteMes =
+                inicioMes.AddMonths(1);
+
+            using (OleDbConnection conn =
+                Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+                string query = @"
+            SELECT SUM(Val(TotDiscosEntregados))
+            FROM CopiasAudiencias
+            WHERE FeRecibo >= ?
+            AND FeRecibo < ?";
+
+                using (OleDbCommand cmd =
+                    new OleDbCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue(
+                        "?",
+                        inicioMes);
+
+                    cmd.Parameters.AddWithValue(
+                        "?",
+                        inicioSiguienteMes);
+
+                    object resultado =
+                        cmd.ExecuteScalar();
+
+                    if (resultado != null &&
+                        resultado != DBNull.Value)
+                    {
+                        total = Convert.ToInt32(resultado);
+                    }
+                }
+            }
+
+            return total;
+        }
+
+
+        public int ObtenerAudienciasHoy()
+        {
+            int total = 0;
+
+            DateTime inicioDia = DateTime.Today;
+            DateTime inicioSiguienteDia = inicioDia.AddDays(1);
+
+            using (OleDbConnection conn = Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+
+
+                foreach (string nombreTabla in ObtenerTablasAudiencias(conn))
+                {
+
+                    try
+                    {
+                        string query = @"
+                    SELECT COUNT(*)
+                    FROM [" + nombreTabla + @"]
+                    WHERE FeAudiencia >= ?
+                    AND FeAudiencia < ?";
+
+                        using (OleDbCommand cmd = new OleDbCommand(query, conn))
+                        {
+                            cmd.Parameters.AddWithValue("?", inicioDia);
+                            cmd.Parameters.AddWithValue("?", inicioSiguienteDia);
+
+                            object resultado = cmd.ExecuteScalar();
+
+                            if (resultado != null &&
+                                resultado != DBNull.Value)
+                            {
+                                total += Convert.ToInt32(resultado);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            ex.Message,
+                            nombreTabla);
+                    }
+                }
+            }
+
+            return total;
+        }
+
+
+        public string ObtenerVersionSistema()
+        {
+            Version version =
+                Assembly.GetExecutingAssembly().GetName().Version;
+
+            return $"v{version.Major}.{version.Minor}.{version.Build}";
+        }
+
+        public string ObtenerEstadoSistema()
+        {
+            try
+            {
+                using (var cn = Conexion.ObtenerConexion())
+                {
+                    cn.Open();
+                }
+
+                return "Operativo";
+            }
+            catch
+            {
+                return "Sin conexión";
+            }
+        }
+
+
+        public string ObtenerNombreBaseDatos()
+        {
+            return Path.GetFileName(Conexion.RutaBD);
+        }
+
+
+        public List<ActividadReciente> ObtenerActividadesRecientes()
+        {
+            List<ActividadReciente> actividades = new List<ActividadReciente>();
+
+            actividades.AddRange(ObtenerActividadesAudiencias());
+
+            actividades.AddRange(ObtenerActividadesCopias());
+
+            actividades.AddRange(ObtenerActividadesEjecuciones());
+
+            return actividades
+                .OrderByDescending(x => x.FechaHora)
+                .Take(8)
+                .ToList();
+        }
+
+        private List<ActividadReciente> ObtenerActividadesAudiencias()
+        {
+            List<ActividadReciente> lista = new List<ActividadReciente>();
+
+            using (OleDbConnection conn = Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+                foreach (string nombreTabla in ObtenerTablasAudiencias(conn))
+                {
+                    try
+                    {
+                        string query = $@"
+                    SELECT TOP 10 *
+                    FROM [{nombreTabla}]
+                    WHERE FeRecibo IS NOT NULL
+                    ORDER BY FeRecibo DESC";
+
+                        using (OleDbCommand cmd = new OleDbCommand(query, conn))
+                        using (OleDbDataReader dr = cmd.ExecuteReader())
+                        {
+                            while (dr.Read())
+                            {
+                                lista.Add(new ActividadReciente
+                                {
+                                    FechaHora = Convert.ToDateTime(dr["FeRecibo"]),
+
+                                    Icono = "⚖",
+
+                                    TipoActividad = "Registro de audiencia",
+
+                                    Descripcion =
+        $"NUC: {dr["NUC"]} | Causa: {dr["NoCausa"]}",
+
+                                    Usuario = dr["Quien Realiza"].ToString(),
+
+                                    IdRegistro = Convert.ToInt32(dr["Id"]),
+
+                                    TablaDestino = nombreTabla,
+
+                                    Sala = TieneColumna(dr, "Sala")
+                                        ? dr["Sala"]?.ToString() ?? ""
+                                        : "",
+
+                                    TotalDiscos = BuscadorRegistros
+                                        .ExtraerNumero(TieneColumna(dr, "TotDiscoAudiencia")
+                                            ? dr["TotDiscoAudiencia"]?.ToString()
+                                            : "")
+                                        .ToString(),
+                                });
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(
+                            ex.Message,
+                            nombreTabla);
+                    }
+                }
+            }
+
+            return lista;
+        }
+
+        private List<ActividadReciente> ObtenerActividadesCopias()
+        {
+            List<ActividadReciente> lista = new List<ActividadReciente>();
+
+            using (OleDbConnection conn = Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+
+                string nombreTabla =
+    ObtenerNombreTablaPorColumna(
+        conn,
+        "TotDiscosEntregados");
+
+                string query = $@"
+SELECT TOP 10 *
+FROM [{nombreTabla}]
+WHERE FeRecibo IS NOT NULL
+ORDER BY FeRecibo DESC";
+
+                using (OleDbCommand cmd = new OleDbCommand(query, conn))
+                using (OleDbDataReader dr = cmd.ExecuteReader())
+                {
+                    while (dr.Read())
+                    {
+                        string nuc = dr["NUC"]?.ToString() ?? "";
+                        string causa = dr["NoCausa"]?.ToString() ?? "";
+
+                        string descripcion = "";
+
+                        if (!string.IsNullOrWhiteSpace(nuc))
+                            descripcion = $"NUC: {nuc}";
+
+                        if (!string.IsNullOrWhiteSpace(causa))
+                        {
+                            if (descripcion != "")
+                                descripcion += " | ";
+
+                            descripcion += $"Causa: {causa}";
+                        }
+
+                        lista.Add(new ActividadReciente
+                        {
+                            FechaHora = Convert.ToDateTime(dr["FeRecibo"]),
+                            Icono = "💿",
+                            TipoActividad = "Entrega de copias",
+                            Descripcion = descripcion,
+                            Usuario = dr["Quien Realiza"].ToString(),
+                            IdRegistro = Convert.ToInt32(dr["Id"]),
+
+                            TablaDestino = nombreTabla,
+
+                            // Registro de Copias no tiene columna Sala —
+                            // queda vacía, tal como lo pidió el usuario para
+                            // cuando el campo no exista en ese tipo de registro.
+                            Sala = TieneColumna(dr, "Sala")
+                                ? dr["Sala"]?.ToString() ?? ""
+                                : "",
+
+                            TotalDiscos = BuscadorRegistros
+                                .ExtraerNumero(dr["TotDiscosEntregados"]?.ToString())
+                                .ToString(),
+                        });
+                    }
+                }
+            }
+
+            return lista;
+        }
+
+        private List<ActividadReciente> ObtenerActividadesEjecuciones()
+        {
+            List<ActividadReciente> lista = new List<ActividadReciente>();
+
+            using (OleDbConnection conn = Conexion.ObtenerConexion())
+            {
+                conn.Open();
+
+                string nombreTabla =
+    ObtenerNombreTablaPorColumna(
+        conn,
+        "Expediente");
+
+                string query = $@"
+SELECT TOP 10 *
+FROM [{nombreTabla}]
+WHERE FechaAudiencia IS NOT NULL
+ORDER BY FechaAudiencia DESC";
+
+                using (OleDbCommand cmd = new OleDbCommand(query, conn))
+                using (OleDbDataReader dr = cmd.ExecuteReader())
+                {
+                    while (dr.Read())
+                    {
+                        string expediente = dr["Expediente"]?.ToString() ?? "";
+                        string causa = dr["Causa"]?.ToString() ?? "";
+
+                        string descripcion = "";
+
+                        if (!string.IsNullOrWhiteSpace(expediente))
+                            descripcion = $"Expediente: {expediente}";
+
+                        if (!string.IsNullOrWhiteSpace(causa))
+                        {
+                            if (descripcion != "")
+                                descripcion += " | ";
+
+                            descripcion += $"Causa: {causa}";
+                        }
+
+                        lista.Add(new ActividadReciente
+                        {
+                            FechaHora = Convert.ToDateTime(dr["FechaAudiencia"]),
+                            Icono = "✔",
+                            TipoActividad = "Registro de ejecución",
+                            Descripcion = descripcion,
+                            Usuario = dr["Observaciones"].ToString(),
+                            IdRegistro = Convert.ToInt32(dr["Id"]),
+                            TablaDestino = nombreTabla,
+
+                            Sala = TieneColumna(dr, "Sala")
+                                ? dr["Sala"]?.ToString() ?? ""
+                                : "",
+
+                            TotalDiscos = BuscadorRegistros
+                                .ExtraerNumero(TieneColumna(dr, "TotalDiscos")
+                                    ? dr["TotalDiscos"]?.ToString()
+                                    : "")
+                                .ToString(),
+                        });
+                    }
+                }
+            }
+
+            return lista;
+        }
+
+
+        /// <summary>
+        /// Igual que AudienciaData.ExisteColumna: comprueba si la fila
+        /// actual trae una columna con ese nombre, para leer campos que no
+        /// existen en todas las tablas (ej. Sala en tablas de Audiencias
+        /// archivadas muy antiguas, o en Registro de Copias) sin que la
+        /// consulta truene.
+        /// </summary>
+        private static bool TieneColumna(OleDbDataReader dr, string nombre)
+        {
+            for (int i = 0; i < dr.FieldCount; i++)
+            {
+                if (dr.GetName(i).Equals(nombre, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private List<string> ObtenerTablasAudiencias(OleDbConnection conn)
+        {
+            List<string> tablas = new List<string>();
+
+            DataTable schema = conn.GetSchema("Tables");
+
+            foreach (DataRow row in schema.Rows)
+            {
+                string nombreTabla = row["TABLE_NAME"].ToString();
+
+                if (nombreTabla.StartsWith("MSys"))
+                    continue;
+
+                if (nombreTabla.StartsWith(
+                    "Audiencias ",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    tablas.Add(nombreTabla);
+                }
+            }
+
+            return tablas;
+        }
+
+
+        private string ObtenerNombreTablaPorColumna(
+    OleDbConnection conn,
+    string columna)
+        {
+            DataTable schema = conn.GetSchema("Tables");
+
+            foreach (DataRow row in schema.Rows)
+            {
+                string nombreTabla = row["TABLE_NAME"].ToString();
+
+                if (nombreTabla.StartsWith("MSys"))
+                    continue;
+
+                try
+                {
+                    DataTable columnas =
+                        conn.GetOleDbSchemaTable(
+                            OleDbSchemaGuid.Columns,
+                            new object[] { null, null, nombreTabla, null });
+
+                    foreach (DataRow columnaRow in columnas.Rows)
+                    {
+                        if (columnaRow["COLUMN_NAME"].ToString()
+                            .Equals(columna,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            return nombreTabla;
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return "";
+        }
+
+
+    }
+}
